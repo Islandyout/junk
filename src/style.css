@@ -1,0 +1,32 @@
+:root {
+  color-scheme: dark;
+  font-family: "Manrope", sans-serif;
+  background: #090b14;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #090b14; }
+body { display: grid; place-items: center; }
+#game-shell {
+  position: relative;
+  width: min(100vw, 177.7778vh);
+  height: min(100vh, 56.25vw);
+  overflow: hidden;
+  background: #090b14;
+  box-shadow: 0 0 90px #000;
+}
+#game, #game canvas { width: 100%; height: 100%; display: block; }
+#vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 48%, rgba(3,5,12,.48) 100%);
+}
+#boot-mark {
+  position: absolute; top: 20px; left: 26px; z-index: 5;
+  color: #e6dfef; font: 800 10px "Manrope", sans-serif; letter-spacing: .28em;
+  opacity: .55; pointer-events: none;
+}
+#boot-mark span { color: #a998c8; font-weight: 500; }
+@media (max-aspect-ratio: 4/5) {
+  #game-shell { width: 100vw; height: 56.25vw; transform: rotate(90deg); }
+}
