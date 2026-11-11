@@ -4,7 +4,7 @@ import { InputController } from "../systems/InputController";
 type CombatAction = "attack" | "heavy" | "special";
 
 export class GameScene extends Phaser.Scene {
-  private input!: InputController;
+  private controls!: InputController;
   private player!: Phaser.Physics.Arcade.Sprite;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private hud!: Phaser.GameObjects.Container;
@@ -31,7 +31,7 @@ export class GameScene extends Phaser.Scene {
     this.createWorld();
     this.createPlayer();
     this.createInterface();
-    this.input = new InputController(this);
+    this.controls = new InputController(this);
 
     this.physics.add.collider(this.player, this.platforms);
     this.cameras.main.startFollow(this.player, true, 0.085, 0.085);
@@ -39,10 +39,10 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setDeadzone(250, 120);
     this.cameras.main.setBackgroundColor("#0b1020");
 
-    this.input.keyboard?.on("keydown-ESC", () => this.togglePause());
-    this.input.keyboard?.on("keydown-TAB", (event: KeyboardEvent) => {
-      event.preventDefault();
-      this.toggleStatus();
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (pointer.button === 0 && !this.paused && !this.statusPanel.visible) {
+        this.performAttack("attack", this.time.now);
+      }
     });
 
     this.add.text(44, 670, "ASHEN VERGE  /  THE FIRST WOUND", {
@@ -187,12 +187,17 @@ export class GameScene extends Phaser.Scene {
 
   update(time: number, delta: number): void {
     if (this.paused) return;
+    if (this.controls.statusPressed) this.toggleStatus();
+    if (this.statusPanel.visible) {
+      if (this.controls.pausePressed) this.toggleStatus();
+      return;
+    }
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    if (this.input.left) {
+    if (this.controls.left) {
       this.player.setAccelerationX(-1900);
       this.facing = -1;
-    } else if (this.input.right) {
+    } else if (this.controls.right) {
       this.player.setAccelerationX(1900);
       this.facing = 1;
     } else {
@@ -200,12 +205,12 @@ export class GameScene extends Phaser.Scene {
     }
     this.player.setFlipX(this.facing < 0);
 
-    if (this.input.jumpPressed && body.blocked.down) {
+    if (this.controls.jumpPressed && body.blocked.down) {
       this.player.setVelocityY(-610);
       this.spawnDust(this.player.x, this.player.y + 42);
     }
 
-    if (this.input.dodgePressed && time - this.lastDodge > 850 && !this.dodging) {
+    if (this.controls.dodgePressed && time - this.lastDodge > 850 && !this.dodging) {
       this.lastDodge = time;
       this.dodging = true;
       this.player.setVelocityX(this.facing * 620);
@@ -216,29 +221,28 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    if (this.input.attackPressed) this.performAttack("attack", time);
-    if (this.input.heavyPressed) this.performAttack("heavy", time);
-    if (this.input.specialPressed && time - this.lastSpecial > 4200 && this.energy >= 35) {
+    if (this.controls.attackPressed) this.performAttack("attack", time);
+    if (this.controls.heavyPressed) this.performAttack("heavy", time);
+    if (this.controls.specialPressed && time - this.lastSpecial > 4200 && this.energy >= 35) {
       this.lastSpecial = time;
       this.energy -= 35;
       this.performAttack("special", time);
       this.updateBars();
     }
 
-    if (this.input.switchPressed) {
+    if (this.controls.switchPressed) {
       this.weaponIndex = (this.weaponIndex + 1) % this.weapons.length;
       const label = this.hud.getByName("weaponLabel") as Phaser.GameObjects.Text;
       label.setText(`0${this.weaponIndex + 1}  /  ${this.weapons[this.weaponIndex]}`);
     }
 
-    if (this.input.interactPressed) {
+    if (this.controls.interactPressed) {
       this.prompt.setText("THE SHRINE IS COLD. SOMETHING ANSWERS FAR BELOW.");
       this.prompt.setAlpha(1);
       this.time.delayedCall(2200, () => this.prompt.setAlpha(0));
     }
 
-    if (this.input.statusPressed) this.toggleStatus();
-    if (this.input.pausePressed) this.togglePause();
+    if (this.controls.pausePressed) this.togglePause();
 
     if (this.player.y > 820) {
       this.player.setPosition(180, 590);
