@@ -6,6 +6,10 @@ type CombatAction = "attack" | "heavy" | "special";
 export class GameScene extends Phaser.Scene {
   private controls!: InputController;
   private player!: Phaser.Physics.Arcade.Sprite;
+  private enemy!: Phaser.Physics.Arcade.Sprite;
+  private enemyHealth = 100;
+  private enemyDirection: 1 | -1 = -1;
+  private lastEnemyHit = 0;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private hud!: Phaser.GameObjects.Container;
   private prompt!: Phaser.GameObjects.Text;
@@ -30,10 +34,12 @@ export class GameScene extends Phaser.Scene {
     this.createTextures();
     this.createWorld();
     this.createPlayer();
+    this.createEnemy();
     this.createInterface();
     this.controls = new InputController(this);
 
     this.physics.add.collider(this.player, this.platforms);
+    this.physics.add.collider(this.enemy, this.platforms);
     this.cameras.main.startFollow(this.player, true, 0.085, 0.085);
     this.cameras.main.setBounds(0, 0, this.worldWidth, 720);
     this.cameras.main.setDeadzone(250, 120);
@@ -64,6 +70,15 @@ export class GameScene extends Phaser.Scene {
     hero.fillStyle(0x8d9bb8); hero.fillTriangle(13, 41, 2, 67, 19, 57);
     hero.fillStyle(0xb7a0dc, 0.9); hero.fillCircle(31, 25, 2);
     hero.generateTexture("hero", 56, 94); hero.destroy();
+
+    const foe = this.make.graphics({ x: 0, y: 0 });
+    foe.fillStyle(0x17101f); foe.fillRoundedRect(10, 30, 38, 48, 10);
+    foe.fillStyle(0x49304e); foe.fillRoundedRect(16, 38, 26, 32, 8);
+    foe.fillStyle(0x211624); foe.fillCircle(29, 20, 18);
+    foe.fillStyle(0xd88baf); foe.fillCircle(22, 21, 3); foe.fillCircle(36, 21, 3);
+    foe.fillStyle(0x8f4c83, 0.8); foe.fillTriangle(12, 42, -2, 65, 17, 60);
+    foe.fillTriangle(45, 42, 60, 65, 40, 60);
+    foe.generateTexture("hollow", 58, 88); foe.destroy();
 
     const floor = this.make.graphics({ x: 0, y: 0 });
     floor.fillStyle(0x171b2a); floor.fillRect(0, 0, 128, 40);
@@ -143,6 +158,14 @@ export class GameScene extends Phaser.Scene {
     this.player.setBounce(0);
   }
 
+  private createEnemy(): void {
+    this.enemy = this.physics.add.sprite(620, 590, "hollow");
+    this.enemy.setDepth(8).setScale(1.12).setCollideWorldBounds(true);
+    this.enemy.setSize(38, 72).setOffset(10, 12);
+    this.enemy.setBounce(0).setDragX(900).setMaxVelocity(150, 900);
+    this.enemy.setTint(0xc7a0c9);
+  }
+
   private createInterface(): void {
     this.hud = this.add.container(0, 0).setScrollFactor(0).setDepth(40);
     const plate = this.add.rectangle(170, 76, 292, 104, 0x0b0e19, 0.78).setOrigin(0.5);
@@ -164,6 +187,19 @@ export class GameScene extends Phaser.Scene {
       letterSpacing: 2
     }).setOrigin(1, 0);
     this.hud.add(weapon.setName("weaponLabel"));
+
+    const controls = this.add.text(1240, 68,
+      "A / D  MOVE     SPACE  JUMP\nJ  QUICK   K  HEAVY   L  VOID\nSHIFT  DODGE     Q  WEAPON", {
+        fontFamily: "DM Mono", fontSize: "9px", color: "#a9a2bd",
+        align: "right", lineSpacing: 7, letterSpacing: 1
+      }).setOrigin(1, 0).setAlpha(0.9);
+    this.hud.add(controls);
+
+    const foeLabel = this.add.text(640, 32, "THE HOLLOW // 100", {
+      fontFamily: "DM Mono", fontSize: "10px", color: "#d6a5c4", letterSpacing: 2
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(41).setAlpha(0);
+    foeLabel.setName("enemyLabel");
+    this.hud.add(foeLabel);
 
     this.prompt = this.add.text(640, 625, "E  •  EXAMINE THE BROKEN SHRINE", {
       fontFamily: "DM Mono", fontSize: "11px", color: "#d7c9e9",
@@ -194,6 +230,16 @@ export class GameScene extends Phaser.Scene {
     }
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
+    this.updateEnemy(time);
+    if (Phaser.Math.Distance.Between(this.player.x, this.player.y, this.enemy.x, this.enemy.y) < 48 && time - this.lastEnemyHit > 1100 && this.enemyHealth > 0) {
+      this.lastEnemyHit = time;
+      this.health = Math.max(0, this.health - 9);
+      this.cameras.main.shake(90, 0.002);
+      this.player.setTint(0xe58b9d);
+      this.time.delayedCall(180, () => this.player.clearTint());
+      this.updateBars();
+      if (this.health <= 0) this.respawnPlayer();
+    }
     if (this.controls.left) {
       this.player.setAccelerationX(-1900);
       this.facing = -1;
@@ -270,11 +316,57 @@ export class GameScene extends Phaser.Scene {
       this.facing === 1 ? 1.15 : Math.PI + 1.15, false);
     slash.strokePath();
     slash.setBlendMode(Phaser.BlendModes.ADD);
+    if (this.enemyHealth > 0) {
+      const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.enemy.x, this.enemy.y);
+      const inFront = (this.enemy.x - this.player.x) * this.facing > -18;
+      if (distance < reach + 34 && inFront && Math.abs(this.enemy.y - this.player.y) < 75) {
+        const damage = special ? 48 : heavy ? 30 : 16;
+        this.enemyHealth = Math.max(0, this.enemyHealth - damage);
+        this.enemy.setVelocityX(this.facing * (special ? 430 : heavy ? 300 : 190));
+        this.enemy.setTint(0xffffff);
+        this.time.delayedCall(110, () => { if (this.enemy.active) this.enemy.setTint(0xc7a0c9); });
+        this.cameras.main.shake(75, 0.0025);
+        const label = this.hud.getByName("enemyLabel") as Phaser.GameObjects.Text;
+        label.setText(this.enemyHealth > 0 ? `THE HOLLOW // ${this.enemyHealth}` : "THE HOLLOW // BANISHED");
+        label.setAlpha(1);
+        if (this.enemyHealth <= 0) {
+          this.enemy.setVelocity(0, 0);
+          this.tweens.add({ targets: this.enemy, alpha: 0, scale: 0.2, duration: 650 });
+          this.time.delayedCall(2600, () => {
+            this.enemyHealth = 100;
+            this.enemy.setPosition(this.player.x + 420, 590).setAlpha(1).setScale(1.12);
+            (this.hud.getByName("enemyLabel") as Phaser.GameObjects.Text).setText("THE HOLLOW // 100");
+          });
+        }
+      }
+    }
     this.tweens.add({ targets: slash, alpha: 0, scale: 1.22, duration: special ? 420 : heavy ? 310 : 210, onComplete: () => slash.destroy() });
     this.cameras.main.shake(special ? 110 : 45, special ? 0.003 : 0.0015);
     this.player.setVelocityX(this.facing * (special ? 110 : heavy ? 40 : 70));
     this.time.delayedCall(special ? 460 : heavy ? 390 : 240, () => { this.attacking = false; });
     void time;
+  }
+
+  private updateEnemy(time: number): void {
+    if (!this.enemy.active || this.enemyHealth <= 0) return;
+    const distance = this.enemy.x - this.player.x;
+    if (Math.abs(distance) < 330) {
+      this.enemyDirection = distance < 0 ? -1 : 1;
+      if (Math.abs(distance) > 54) this.enemy.setVelocityX(this.enemyDirection * 92);
+      else this.enemy.setVelocityX(0);
+      this.enemy.setFlipX(this.enemyDirection < 0);
+      if (Math.abs(distance) < 95 && time - this.lastEnemyHit > 1100) this.enemy.setTint(0xe2a0bd);
+    } else {
+      this.enemy.setVelocityX(0);
+    }
+  }
+
+  private respawnPlayer(): void {
+    this.health = 100;
+    this.player.setPosition(Math.max(180, this.enemy.x - 260), 590);
+    this.player.setVelocity(0, 0);
+    this.cameras.main.flash(220, 100, 70, 130);
+    this.updateBars();
   }
 
   private spawnDust(x: number, y: number): void {
