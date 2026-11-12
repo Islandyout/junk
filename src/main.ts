@@ -19,9 +19,9 @@ const config: Phaser.Types.Core.GameConfig = {
     arcade: { gravity: { x: 0, y: 1500 }, debug: false }
   },
   render: {
-    antialias: true,
-    pixelArt: false,
-    roundPixels: false
+    antialias: false,
+    pixelArt: true,
+    roundPixels: true
   },
   scene: [GameScene]
 };
