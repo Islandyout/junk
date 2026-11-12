@@ -60,25 +60,97 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createTextures(): void {
-    const hero = this.make.graphics({ x: 0, y: 0 });
-    hero.fillStyle(0x111522); hero.fillRoundedRect(13, 35, 28, 34, 9);
-    hero.fillStyle(0x8f9bb2); hero.fillRoundedRect(18, 40, 18, 25, 6);
-    hero.fillStyle(0x1a2030); hero.fillRoundedRect(15, 65, 11, 22, 4);
-    hero.fillRoundedRect(29, 65, 11, 22, 4);
-    hero.fillStyle(0xd8c9b5); hero.fillCircle(27, 23, 14);
-    hero.fillStyle(0x171923); hero.fillEllipse(27, 13, 29, 15);
-    hero.fillStyle(0x8d9bb8); hero.fillTriangle(13, 41, 2, 67, 19, 57);
-    hero.fillStyle(0xb7a0dc, 0.9); hero.fillCircle(31, 25, 2);
-    hero.generateTexture("hero", 56, 94); hero.destroy();
+    // Crisp, hand-authored pixel frames. Each pose is its own texture so Phaser
+    // can animate the fighter without scaling or smoothing a vector placeholder.
+    const makeFrame = (key: string, pose: number, foe = false) => {
+      const g = this.make.graphics({ x: 0, y: 0 });
+      const px = (x: number, y: number, w: number, h: number, c: number) => {
+        g.fillStyle(c, 1); g.fillRect(x, y, w, h);
+      };
+      const outline = foe ? 0x160f20 : 0x11111b;
+      const skin = foe ? 0x9d7898 : 0xd9b99d;
+      const cloth = foe ? 0x39243e : 0x20283b;
+      const trim = foe ? 0xb65c91 : 0x8297bd;
+      const glow = foe ? 0xff82c5 : 0xa9d8ef;
+      const bob = pose === 1 ? -2 : pose === 3 ? 1 : 0;
+      const stride = pose === 1 ? 5 : pose === 3 ? -5 : pose === 2 ? 2 : 0;
 
-    const foe = this.make.graphics({ x: 0, y: 0 });
-    foe.fillStyle(0x17101f); foe.fillRoundedRect(10, 30, 38, 48, 10);
-    foe.fillStyle(0x49304e); foe.fillRoundedRect(16, 38, 26, 32, 8);
-    foe.fillStyle(0x211624); foe.fillCircle(29, 20, 18);
-    foe.fillStyle(0xd88baf); foe.fillCircle(22, 21, 3); foe.fillCircle(36, 21, 3);
-    foe.fillStyle(0x8f4c83, 0.8); foe.fillTriangle(12, 42, -2, 65, 17, 60);
-    foe.fillTriangle(45, 42, 60, 65, 40, 60);
-    foe.generateTexture("hollow", 58, 88); foe.destroy();
+      // Rear silhouette, boots and split coat.
+      px(21, 49 + bob, 26, 29, outline);
+      px(24, 52 + bob, 20, 26, cloth);
+      px(19, 70 + stride, 11, 20, outline);
+      px(36, 70 - stride, 11, 20, outline);
+      px(21, 73 + stride, 9, 14, foe ? 0x24172a : 0x30364b);
+      px(38, 73 - stride, 8, 14, foe ? 0x24172a : 0x30364b);
+      px(17, 85 + stride, 16, 5, outline);
+      px(35, 85 - stride, 16, 5, outline);
+      px(25, 55 + bob, 4, 18, trim);
+      px(37, 55 + bob, 3, 17, trim);
+      // Shoulders, torso plates and belt.
+      px(15, 39 + bob, 38, 20, outline);
+      px(19, 42 + bob, 30, 16, cloth);
+      px(14, 42 + bob, 9, 13, trim);
+      px(45, 41 + bob, 10, 14, outline);
+      px(47, 43 + bob, 6, 10, trim);
+      px(23, 46 + bob, 22, 5, foe ? 0x5a3156 : 0x566b91);
+      px(27, 52 + bob, 13, 3, outline);
+      px(31, 51 + bob, 5, 5, glow);
+      // Neck and head, with a readable hair silhouette and face profile.
+      px(29, 31 + bob, 12, 12, outline);
+      px(25, 12 + bob, 23, 25, outline);
+      px(28, 15 + bob, 17, 18, skin);
+      px(26, 12 + bob, 22, 8, foe ? 0x25172d : 0x171923);
+      px(24, 17 + bob, 7, 12, foe ? 0x25172d : 0x171923);
+      px(42, 19 + bob, 5, 4, outline);
+      px(41, 22 + bob, 3, 2, glow);
+      px(29, 29 + bob, 12, 3, foe ? 0x6f456d : 0xb18c83);
+      // Scarf / trailing mantle, broken into hard-edged pixel clusters.
+      if (!foe) {
+        px(12 - (pose === 2 ? 5 : 0), 43 + bob, 13, 7, 0x697da4);
+        px(7 - (pose === 2 ? 7 : 0), 49 + bob, 13, 5, 0x394765);
+        px(3 - (pose === 2 ? 8 : 0), 54 + bob, 12, 4, 0x252d43);
+      } else {
+        px(8, 44 + bob, 15, 7, 0x6f3a69);
+        px(2, 51 + bob, 13, 5, 0x40243f);
+        px(0, 56 + bob, 11, 4, 0x27192d);
+      }
+      // Foreground arm and weapon pose.
+      const armY = pose === 2 ? 34 : 43 + bob;
+      px(43, armY, 9, 8, outline);
+      px(47, armY + 5, 7, 8, skin);
+      if (!foe) {
+        const bladeX = pose === 2 ? 52 : 51;
+        const bladeY = pose === 2 ? 18 : 30 + bob;
+        px(bladeX, bladeY, 4, 29, 0xc9d9e8);
+        px(bladeX + 1, bladeY - 5, 2, 7, 0xf3f2df);
+        px(bladeX - 2, bladeY + 23, 8, 4, 0x9b79bf);
+        px(bladeX + 1, bladeY + 28, 2, 5, outline);
+      } else {
+        px(48, 36 + bob, 8, 7, 0x24172a);
+        px(53, 41 + bob, 5, 4, 0xd15e9c);
+      }
+      // Small highlights make the silhouette legible at native pixel scale.
+      px(28, 16 + bob, 10, 2, foe ? 0x55304f : 0x3c455d);
+      px(20, 43 + bob, 7, 2, foe ? 0x9e5487 : 0xa6b6d2);
+      g.generateTexture(key, 64, 96);
+      g.destroy();
+    };
+
+    for (let i = 0; i < 4; i++) makeFrame(`hero_walk_${i}`, i);
+    makeFrame("hero_idle_0", 0); makeFrame("hero_idle_1", 1);
+    makeFrame("hero_attack_0", 2); makeFrame("hero_attack_1", 3);
+    makeFrame("hero_attack_2", 2);
+    makeFrame("hero_jump", 2); makeFrame("hero_dodge", 3);
+    for (let i = 0; i < 4; i++) makeFrame(`hollow_walk_${i}`, i, true);
+    makeFrame("hollow_idle_0", 0, true); makeFrame("hollow_idle_1", 1, true);
+
+    const anim = (key: string, prefix: string, count: number, rate: number, repeat: number) =>
+      this.anims.create({ key, frames: Array.from({ length: count }, (_, i) => ({ key: `${prefix}${i}` })), frameRate: rate, repeat });
+    anim("hero_idle", "hero_idle_", 2, 3, -1);
+    anim("hero_walk", "hero_walk_", 4, 10, -1);
+    anim("hero_attack", "hero_attack_", 3, 15, 0);
+    anim("hollow_idle", "hollow_idle_", 2, 3, -1);
+    anim("hollow_walk", "hollow_walk_", 4, 7, -1);
 
     const floor = this.make.graphics({ x: 0, y: 0 });
     floor.fillStyle(0x171b2a); floor.fillRect(0, 0, 128, 40);
@@ -149,19 +221,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createPlayer(): void {
-    this.player = this.physics.add.sprite(180, 590, "hero");
-    this.player.setDepth(8).setScale(1.12);
+    this.player = this.physics.add.sprite(180, 590, "hero_idle_0");
+    this.player.setDepth(8).setScale(1.65).play("hero_idle");
     this.player.setCollideWorldBounds(true);
     this.player.setDragX(1800);
     this.player.setMaxVelocity(360, 1100);
-    this.player.setSize(27, 74).setOffset(14, 15);
+    this.player.setSize(27, 74).setOffset(18, 15);
     this.player.setBounce(0);
   }
 
   private createEnemy(): void {
-    this.enemy = this.physics.add.sprite(620, 590, "hollow");
-    this.enemy.setDepth(8).setScale(1.12).setCollideWorldBounds(true);
-    this.enemy.setSize(38, 72).setOffset(10, 12);
+    this.enemy = this.physics.add.sprite(620, 590, "hollow_idle_0");
+    this.enemy.setDepth(8).setScale(1.65).play("hollow_idle").setCollideWorldBounds(true);
+    this.enemy.setSize(34, 72).setOffset(15, 12);
     this.enemy.setBounce(0).setDragX(900).setMaxVelocity(150, 900);
     this.enemy.setTint(0xc7a0c9);
   }
@@ -249,7 +321,7 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.player.setAccelerationX(0);
     }
-    this.player.setFlipX(this.facing < 0);
+    this.player.setFlipX(this.facing < 0);\n    if (this.attacking) this.player.anims.play("hero_attack", true);\n    else if (!body.blocked.down) this.player.setTexture("hero_jump");\n    else if (this.dodging) this.player.setTexture("hero_dodge");\n    else if (Math.abs(body.velocity.x) > 35) this.player.anims.play("hero_walk", true);\n    else this.player.anims.play("hero_idle", true);
 
     if (this.controls.jumpPressed && body.blocked.down) {
       this.player.setVelocityY(-610);
@@ -334,7 +406,7 @@ export class GameScene extends Phaser.Scene {
           this.tweens.add({ targets: this.enemy, alpha: 0, scale: 0.2, duration: 650 });
           this.time.delayedCall(2600, () => {
             this.enemyHealth = 100;
-            this.enemy.setPosition(this.player.x + 420, 590).setAlpha(1).setScale(1.12);
+            this.enemy.setPosition(this.player.x + 420, 590).setAlpha(1).setScale(1.65);
             (this.hud.getByName("enemyLabel") as Phaser.GameObjects.Text).setText("THE HOLLOW // 100");
           });
         }
@@ -354,7 +426,7 @@ export class GameScene extends Phaser.Scene {
       this.enemyDirection = distance < 0 ? -1 : 1;
       if (Math.abs(distance) > 54) this.enemy.setVelocityX(this.enemyDirection * 92);
       else this.enemy.setVelocityX(0);
-      this.enemy.setFlipX(this.enemyDirection < 0);
+      this.enemy.setFlipX(this.enemyDirection < 0);\n      this.enemy.anims.play(Math.abs(distance) > 54 ? "hollow_walk" : "hollow_idle", true);
       if (Math.abs(distance) < 95 && time - this.lastEnemyHit > 1100) this.enemy.setTint(0xe2a0bd);
     } else {
       this.enemy.setVelocityX(0);
